@@ -62,13 +62,17 @@ def parse_args() -> argparse.Namespace:
 
     parser.add_argument("--min-std", type=float, default=1e-3,
                         help="Minimum standard deviation for stochastic Gaussian policies.")
-    parser.add_argument("--max-std", type=float, default=2.0,
+    parser.add_argument("--max-std", type=float, default=float("inf"),
                         help="Maximum standard deviation for stochastic Gaussian policies.")
     parser.add_argument("--gaussian-fisher-scaling", type=str, default="wpo",
                         choices=["none", "pg", "wpo", "all"],
                         help=("Apply simplified Gaussian Fisher scaling to stochastic policy-output gradients. "
                               "'wpo' reproduces the WPO setting; 'pg' applies it only to PG; "
                               "'all' applies it to both PG and WPO; 'none' disables it."))
+    parser.add_argument("--pg-use-baseline", action="store_true", default=True,
+                        help="For PG, subtract a Q baseline to reduce gradient variance (default: True).")
+    parser.add_argument("--no-pg-use-baseline", dest="pg_use_baseline", action="store_false",
+                        help="Disable the PG baseline term.")
 
     parser.add_argument("--ou-sigma", type=float, default=0.2,
                         help="Ornstein-Uhlenbeck exploration noise scale for DPG.")
@@ -155,6 +159,7 @@ def stochastic_actor_backward(
     obs: torch.Tensor,
     sample_size: int,
     update_type: str,
+    use_pg_baseline: bool,
     use_gaussian_fisher_scaling: bool,
     grad_clip: float,
 ) -> tuple[float, float]:
@@ -163,6 +168,8 @@ def stochastic_actor_backward(
 
     update_type='PG':
         maximizes E[Q(s,a) log pi(a|s)] with sampled actions detached.
+        If use_pg_baseline=True, uses (Q - b) log pi where b is the
+        per-state sample mean of Q, which reduces variance.
 
     update_type='WPO':
         maximizes E[grad_a log pi(a|s)^T grad_a Q(s,a)].
@@ -192,6 +199,9 @@ def stochastic_actor_backward(
     if update_type == "PG":
         logp = dist.log_prob(actions).sum(dim=-1)
         q_values = critic(obs_flat, act_flat).detach().reshape(sample_size, batch_size)
+        if use_pg_baseline:
+            baseline = q_values.mean(dim=0, keepdim=True)
+            q_values = q_values - baseline
         objective = (q_values * logp).mean()
     else:
         act_req = act_flat.detach().requires_grad_(True)
@@ -340,6 +350,7 @@ def main() -> None:
                         "std_min": float(std_probe.min().item()),
                         "std_max": float(std_probe.max().item()),
                         "gaussian_fisher_scaling_used": should_use_gaussian_fisher_scaling(args, args.method),
+                        "pg_baseline_used": bool(args.pg_use_baseline) if args.method == "PG" else False,
                     })
             append_csv(row, metrics_path)
 
@@ -386,6 +397,7 @@ def main() -> None:
                     obs=obs_b,
                     sample_size=args.sample_size,
                     update_type=args.method,
+                    use_pg_baseline=args.pg_use_baseline,
                     use_gaussian_fisher_scaling=use_scaling,
                     grad_clip=args.actor_grad_clip,
                 )

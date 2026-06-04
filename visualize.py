@@ -262,6 +262,18 @@ def save_fig(fig: plt.Figure, path: Path, dpi: int) -> None:
     plt.close(fig)
 
 
+def filter_groups_by_prefix(
+    groups: Dict[str, List[pd.DataFrame]], prefixes: Tuple[str, ...]
+) -> Dict[str, List[pd.DataFrame]]:
+    prefixes_upper = tuple(p.upper() for p in prefixes)
+    out: Dict[str, List[pd.DataFrame]] = {}
+    for label, dfs in groups.items():
+        label_upper = label.upper()
+        if any(label_upper.startswith(p) for p in prefixes_upper):
+            out[label] = dfs
+    return out
+
+
 # ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
@@ -295,6 +307,16 @@ def main():
     plot_column(ax, groups, "critic_loss",
                 ylabel="Critic Loss", xlabel="Environment Steps", args=args)
     save_fig(fig, out_dir / "fig_critic_loss.png", args.dpi)
+
+    # Figure 4: Policy output std for PG/WPO only.
+    std_groups = filter_groups_by_prefix(groups, ("PG", "WPO"))
+    if std_groups:
+        fig, ax = plt.subplots(figsize=(8, 4), constrained_layout=True)
+        plot_column(ax, std_groups, "std_mean",
+                    ylabel="Policy Output Std", xlabel="Environment Steps", args=args)
+        save_fig(fig, out_dir / "fig_policy_std_pg_wpo.png", args.dpi)
+    else:
+        print("Skipped policy std figure: no PG/WPO runs found.")
 
 
 if __name__ == "__main__":
