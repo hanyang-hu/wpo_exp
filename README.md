@@ -11,3 +11,32 @@ python run_toy_example.py --method WPO --batch-size 1024 --lr 0.005 --num-iters 
 
 python vis_toy_example.py
 ```
+
+## Inverted pendulum example.
+
+DDPG-style actor-critic experiment for Gymnasium `Pendulum-v1`, with three actor update options:
+
+- `PG`: stochastic Gaussian actor with log-likelihood gradients weighted by critic values.
+- `DPG`: deterministic policy gradient / DDPG-style actor update.
+- `WPO`: stochastic Gaussian actor with the WPO action-gradient transport update and simplified Gaussian Fisher scaling.
+
+
+```bash
+python train.py --method PG  --num-iters 50000 --gaussian-fisher-scaling wpo
+python train.py --method DPG --num-iters 50000 --gaussian-fisher-scaling wpo
+python train.py --method WPO --num-iters 50000 --gaussian-fisher-scaling wpo
+```
+
+Results are written to:
+
+```text
+./results/inverted_pendulum/<run_name>/
+```
+
+Each run contains `config.json`, `metrics.csv`, `actor.pt`, and `critic.pt`.
+
+To visualize one run or compare multiple runs under a parent folder:
+
+```bash
+python visualize.py --result-dir ./results/inverted_pendulum
+```
