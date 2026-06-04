@@ -22,9 +22,9 @@ DDPG-style actor-critic experiment for Gymnasium `Pendulum-v1`, with three actor
 
 
 ```bash
-python train.py --method PG  --num-iters 50000 --gaussian-fisher-scaling wpo
-python train.py --method DPG --num-iters 50000 --gaussian-fisher-scaling wpo
-python train.py --method WPO --num-iters 50000 --gaussian-fisher-scaling wpo
+python train.py --method PG  --num-iters 30000 --gaussian-fisher-scaling wpo --seed 42
+python train.py --method DPG --num-iters 30000 --gaussian-fisher-scaling wpo --seed 42
+python train.py --method WPO --num-iters 30000 --gaussian-fisher-scaling wpo --seed 42
 ```
 
 Results are written to:

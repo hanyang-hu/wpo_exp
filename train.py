@@ -378,6 +378,8 @@ def main() -> None:
                 last_actor_objective = float((-actor_loss).detach().item())
             else:
                 use_scaling = should_use_gaussian_fisher_scaling(args, args.method)
+                if args.method == "PG" and args.gaussian_fisher_scaling == "wpo" and use_scaling:
+                    raise RuntimeError("PG should not use Gaussian Fisher scaling when --gaussian-fisher-scaling=wpo.")
                 last_actor_objective, last_actor_grad_norm = stochastic_actor_backward(
                     actor=actor,
                     critic=critic,

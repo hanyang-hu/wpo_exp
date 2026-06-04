@@ -77,7 +77,8 @@ def method_label(run_dir: Path) -> str:
     Rules:
       - DPG / WPO / NPG            -> "DPG" / "WPO" / "NPG"  (scale irrelevant)
       - PG  + scale none           -> "PG"
-      - PG  + scale pg / all       -> "PG (scaled)"
+            - PG  + scale wpo            -> "PG"  (WPO-only scaling does not apply to PG)
+            - PG  + scale pg / all       -> "PG (scaled)"
     Falls back to the raw name (seed stripped) if the pattern is not matched.
     """
     name = run_dir.name
@@ -92,7 +93,7 @@ def method_label(run_dir: Path) -> str:
     # PG (and any unknown method): check scale value
     scale_m = _SCALE_RE.search(name)
     scale = scale_m.group(1).lower() if scale_m else "none"
-    if scale in {"none", ""}:
+    if scale in {"none", "", "wpo"}:
         return method
     return f"{method} (scaled)"
 
