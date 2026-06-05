@@ -65,6 +65,7 @@ def find_metric_files(root: Path) -> List[Path]:
 _SEED_RE = re.compile(r"_seed\d+", re.IGNORECASE)
 _METHOD_RE = re.compile(r"^(PG|NPG|DPG|WPO)", re.IGNORECASE)
 _SCALE_RE = re.compile(r"scale(\w+)", re.IGNORECASE)
+_PG_BASELINE_RE = re.compile(r"_pgbaseline(on|off)", re.IGNORECASE)
 
 # Methods that have their own intrinsic natural-gradient scaling —
 # for these, the scale suffix does not change the displayed name.
@@ -77,8 +78,9 @@ def method_label(run_dir: Path) -> str:
     Rules:
       - DPG / WPO / NPG            -> "DPG" / "WPO" / "NPG"  (scale irrelevant)
       - PG  + scale none           -> "PG"
-            - PG  + scale wpo            -> "PG"  (WPO-only scaling does not apply to PG)
-            - PG  + scale pg / all       -> "PG (scaled)"
+    - PG  + scale wpo            -> "PG"  (WPO-only scaling does not apply to PG)
+    - PG  + scale pg / all       -> "PG (scaled)"
+    - PG  + pgbaselineoff        -> "PG (no baseline)"
     Falls back to the raw name (seed stripped) if the pattern is not matched.
     """
     name = run_dir.name
@@ -93,6 +95,14 @@ def method_label(run_dir: Path) -> str:
     # PG (and any unknown method): check scale value
     scale_m = _SCALE_RE.search(name)
     scale = scale_m.group(1).lower() if scale_m else "none"
+    baseline_m = _PG_BASELINE_RE.search(name)
+    baseline = baseline_m.group(1).lower() if baseline_m else "on"
+
+    if baseline == "off":
+        if scale in {"none", "", "wpo"}:
+            return "PG (no baseline)"
+        return "PG (scaled, no baseline)"
+
     if scale in {"none", "", "wpo"}:
         return method
     return f"{method} (scaled)"
@@ -231,11 +241,16 @@ def plot_column(
 ) -> None:
     for label, dfs in sorted(groups.items()):
         c = color_for(label)
+        clip_upper = 2.0 if col == "std_mean" and label == "PG (no baseline)" else None
         if args.aggregate:
             result = variance_bounds(dfs, col, args.interp_steps, args.variance, dropna=dropna)
             if result is None:
                 continue
             grid, mean, lower, upper = result
+            if clip_upper is not None:
+                mean = np.minimum(mean, clip_upper)
+                lower = np.minimum(lower, clip_upper)
+                upper = np.minimum(upper, clip_upper)
             ax.plot(grid, mean, lw=2.0, label=label, color=c)
             if args.variance != "none" and len(dfs) > 1:
                 ax.fill_between(grid, lower, upper, alpha=0.18, color=c)
@@ -246,6 +261,8 @@ def plot_column(
                 sub = df[["step", col]].copy()
                 if dropna:
                     sub = sub.dropna(subset=[col])
+                if clip_upper is not None:
+                    sub[col] = sub[col].clip(upper=clip_upper)
                 run_label = label if i == 0 else None
                 ax.plot(sub["step"], sub[col], lw=1.4, label=run_label, color=c, alpha=0.75)
 
@@ -313,7 +330,9 @@ def main():
     if std_groups:
         fig, ax = plt.subplots(figsize=(8, 4), constrained_layout=True)
         plot_column(ax, std_groups, "std_mean",
-                    ylabel="Policy Output Std", xlabel="Environment Steps", args=args)
+                    ylabel=r"Policy Output $\sigma$", xlabel="Environment Steps", args=args)
+        ax.set_title(r"Policy Output $\sigma$", fontsize=14)
+        ax.set_ylim(0.0, 2.0)
         save_fig(fig, out_dir / "fig_policy_std_pg_wpo.png", args.dpi)
     else:
         print("Skipped policy std figure: no PG/WPO runs found.")

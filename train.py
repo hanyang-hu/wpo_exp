@@ -264,6 +264,7 @@ def main() -> None:
     run_name = args.run_name or (
         f"{args.method}_seed{args.seed}_"
         f"scale{args.gaussian_fisher_scaling}"
+        f"_pgbaseline{'on' if args.pg_use_baseline else 'off'}"
     )
     run_dir = ensure_dir(Path(args.out_dir) / run_name)
     save_json(vars(args), run_dir / "config.json")
