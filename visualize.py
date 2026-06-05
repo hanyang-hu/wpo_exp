@@ -64,7 +64,8 @@ def find_metric_files(root: Path) -> List[Path]:
 
 _SEED_RE = re.compile(r"_seed\d+", re.IGNORECASE)
 _METHOD_RE = re.compile(r"^(PG|NPG|DPG|WPO)", re.IGNORECASE)
-_SCALE_RE = re.compile(r"scale(\w+)", re.IGNORECASE)
+# Capture only the scale token and stop at the next underscore (if present).
+_SCALE_RE = re.compile(r"scale([^_]+)", re.IGNORECASE)
 _PG_BASELINE_RE = re.compile(r"_pgbaseline(on|off)", re.IGNORECASE)
 
 # Methods that have their own intrinsic natural-gradient scaling —
